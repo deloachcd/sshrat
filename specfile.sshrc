@@ -1,0 +1,37 @@
+# -*- mode: AuthInfo; -*-
+#
+# This file provides an example of the expected syntax of the kind of file a user
+# would write as ~/.sshrc for the 'sshrat' convenience script.
+# Note that this file should at the very least have `chmod 600` perms for the owner,
+# since it can be used to centralize plaintext username/password combos used to
+# connect to remote servers.
+#
+
+## 'Profiles' are specified first - these provide easily reusable groupings of
+## authinfo like usernames, passwords, keyfiles and SSH parameters like alternate
+## ports.
+
+# simplest examples - use a username + password or keyfile to authenticate
+profile password_example login badusername password badpassword
+profile keyfile_example login badusername keyfile ~/altkey.rsa
+# two equivalent ways of specifying a machine using a specific keyfile
+# and a port other than 22. the first uses specific keywords, the second
+# passes the equivalent SSH arguments directly
+profile alt_port_example login badusername keyfile ~/altkey.rsa port 6622
+profile args_example login badusername args -i ~/altkey.rsa -p 6622
+
+## Machines - can use a profile or specify login info on a per-unit basis
+## Note that the two entries use the same login info, but on different hosts.
+## A 'nick' can be specified for commonly accessed machines and referenced
+## when calling the script with @<NICKNAME> in place of a long or difficult to
+## remember hostname or IP address.
+machine primary01.example.poorsoul.net profile password_example nick example01
+machine primary02.example.poorsoul.net login badusername password badpassword nick example02
+# machines can have their own SSH parameters in addition to a profile
+machine primary03.example.poorsoul.net profile password_example nick example03 args -p 6622
+# machines aren't required to have a nickname
+machine primary04.example.poorsoul.net profile password_example
+
+## Syntax GOTCHAs:
+## - the 'args' keyword needs to be specified last for machines and profiles if utilized,
+##   as it's the only one which expects more than one 'word' in its string argument
