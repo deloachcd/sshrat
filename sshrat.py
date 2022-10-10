@@ -8,17 +8,25 @@ import sys
 sshrc_file = "./specfile.sshrc"
 
 
+def init_ssh_session(machine_obj):
+    if "password" in machine_obj.keys():
+        rpipe, wpipe = os.pipe()
+        os.write(wpipe, machine_obj["password"].encode())
+        binary = "sshpass -d {rpipe} -e ssh"
+    else:
+        binary = "ssh"
+    cmd = construct_ssh_command(machine, binary)
+    print(cmd)
+    try:
+        subprocess.run(cmd)
+    except Exception as err:
+        sys.stderr.write("Error when attempting to establish SSH session:\n")
+        sys.stderr.write(f"{type(err).__name__}: {err}\n")
+        exit(-1)
+
+
 def parse_line_fields(line_fields, std_keywords):
     line_obj = {}
-    std_keywords = [
-        "machine",
-        "profile",
-        "nick",
-        "login",
-        "password",
-        "keyfile",
-        "port",
-    ]
     for i in range(0, len(line_fields), 2):
         field_name = line_fields[i]
         if field_name in std_keywords:
@@ -54,14 +62,8 @@ def parse_profile_line(line_fields):
     )
 
 
-def construct_ssh_command(machine_obj):
+def construct_ssh_command(machine_obj, binary):
     machine_keys = machine_obj.keys()
-    if "password" in machine_keys:
-        # TODO link password
-        os.environ["SSHPASS"] = machine_obj["password"]
-        binary = "sshpass -e ssh"
-    else:
-        binary = "ssh"
 
     if "login" in machine_keys:
         target = f"{machine_obj['login']}@{machine_obj['machine']}"
@@ -76,12 +78,7 @@ def construct_ssh_command(machine_obj):
     if "args" in machine_keys:
         args += f"{machine_obj['args']}"
 
-    if binary == "sshpass":
-        cmd = f"{binary} {target} {args}"
-    else:
-        cmd = f"{binary} {args} {target}"
-
-    return cmd.split()
+    return f"{binary} {args} {target}".split()
 
 
 with open(sshrc_file, "r") as infile:
@@ -134,20 +131,24 @@ if args.profile:
     found_profile = False
     for profile in sshrc["profiles"]:
         if args.profile == profile["profile"]:
-            machine_obj = {"machine": args.target}
+            machine = {"machine": args.target}
             for key in profile.keys():
-                machine_obj[key] = profile[key]
+                machine[key] = profile[key]
             found_profile = True
+            break
     if not found_profile:
         sys.stderr.write(f"Warning: specified profile `{args.profile}` not found!\n")
+        exit(-1)
     else:
-        cmd = construct_ssh_command(machine_obj)
-        subprocess.run(cmd)
+        init_ssh_session(machine)
 # Search our parsed file object for information on host
 else:
+    machine_found = False
     for machine in sshrc["machines"]:
         if args.target == machine["machine"] or (
             "nick" in machine.keys() and args.target == machine["nick"]
         ):
-            cmd = construct_ssh_command(machine)
-            subprocess.run(cmd)
+            init_ssh_session(machine)
+            machine_found = True
+    if not machine_found:
+        subprocess.run(["ssh", args.target])
